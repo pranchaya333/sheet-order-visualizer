@@ -4,8 +4,9 @@ import { toast } from "sonner";
 
 // ใช้ API key ที่ถูกต้องจาก Google Cloud Console
 const SPREADSHEET_ID = '1A105rcZ0ktlaWVGf0Z-ImoUNYwOZJqgOoFgp7Vuagcw';
-const API_KEY = 'YOUR_VALID_API_KEY'; // ต้องเปลี่ยนเป็น API key ที่ถูกต้องจาก Google Cloud Console
+const API_KEY = 'YOUR_GOOGLE_API_KEY_HERE'; // แทนที่ด้วย API key ที่ได้จาก Google Cloud Console
 
+// สร้าง interface สำหรับข้อมูลจาก Sheet
 interface SheetData {
   id: number;
   orderNumber: string;
