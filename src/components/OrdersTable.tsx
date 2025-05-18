@@ -10,13 +10,14 @@ import { toast } from "sonner";
 interface OrdersTableProps {
   data: any[];
   sheetName: string;
+  updateCell?: (sheetName: string, row: number, col: number, value: string) => Promise<boolean>;
 }
 
 interface EditState {
   [key: string]: boolean;
 }
 
-const OrdersTable = ({ data, sheetName }: OrdersTableProps) => {
+const OrdersTable = ({ data, sheetName, updateCell }: OrdersTableProps) => {
   const [editableData, setEditableData] = useState<any[]>(data);
   const [editState, setEditState] = useState<EditState>({});
 
@@ -48,10 +49,35 @@ const OrdersTable = ({ data, sheetName }: OrdersTableProps) => {
     setEditableData(updatedData);
   };
 
-  const handleSave = (id: number, field: string) => {
-    // In a real implementation, this would call the API to update the Google Sheet
-    toast.success("บันทึกข้อมูลสำเร็จ");
-    toggleEdit(id, field);
+  const handleSave = async (id: number, field: string) => {
+    const item = editableData.find(item => item.id === id);
+    if (!item) return;
+
+    // ในตอนนี้เป็นเพียงแค่การจำลอง การส่งข้อมูลจริงต้องใช้ตำแหน่งและค่าที่ถูกต้อง
+    const rowIndex = id + 2; // +2 เพราะ row 0 คือ header และ id เริ่มจาก 0
+    let colIndex = 0;
+    
+    switch (field) {
+      case "orderNumber": colIndex = 0; break;
+      case "purchaseOrder": colIndex = 1; break;
+      case "childDetails": colIndex = 2; break;
+      case "designType": colIndex = 3; break;
+      case "quantity": colIndex = 4; break;
+      case "trackingNumber": colIndex = 5; break;
+      case "status": colIndex = 6; break;
+      case "notes": colIndex = 7; break;
+      default: colIndex = 0;
+    }
+
+    if (updateCell) {
+      const success = await updateCell(sheetName, rowIndex, colIndex, String(item[field]));
+      if (success) {
+        toggleEdit(id, field);
+      }
+    } else {
+      toast.success("บันทึกข้อมูลสำเร็จ (ทดสอบ)");
+      toggleEdit(id, field);
+    }
   };
 
   // Helper function to render editable cell

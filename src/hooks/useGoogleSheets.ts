@@ -2,8 +2,9 @@
 import { useState, useEffect } from 'react';
 import { toast } from "sonner";
 
+// ใช้ API key ที่ถูกต้องจาก Google Cloud Console
 const SPREADSHEET_ID = '1A105rcZ0ktlaWVGf0Z-ImoUNYwOZJqgOoFgp7Vuagcw';
-const API_KEY = 'AIzaSyDGMX_mEARxckGw1Uz4P5t-noCjbFbZkh0'; // Google Sheets API key
+const API_KEY = 'YOUR_VALID_API_KEY'; // ต้องเปลี่ยนเป็น API key ที่ถูกต้องจาก Google Cloud Console
 
 interface SheetData {
   id: number;
@@ -31,21 +32,30 @@ export const useGoogleSheets = (sheetName: string) => {
     pendingDesign: 0,
     shipped: 0
   });
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchSheetData = async () => {
       setIsLoading(true);
+      setError(null);
       try {
+        console.log(`Fetching data from sheet: ${sheetName}`);
         // Fetch sheet data using Google Sheets API
         const response = await fetch(
           `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${encodeURIComponent(sheetName)}?key=${API_KEY}`
         );
 
+        console.log(`Response status: ${response.status}`);
+        
         if (!response.ok) {
-          throw new Error('Failed to fetch sheet data');
+          const errorData = await response.json();
+          console.error("API Error:", errorData);
+          throw new Error(`Failed to fetch sheet data: ${errorData?.error?.message || response.statusText}`);
         }
 
         const result = await response.json();
+        console.log("Got data from sheets:", result);
+        
         const rows = result.values || [];
 
         if (rows.length > 0) {
@@ -72,9 +82,13 @@ export const useGoogleSheets = (sheetName: string) => {
           }));
 
           setSheetData(formattedData);
+        } else {
+          setSheetData([]);
+          console.log("No data found in sheet");
         }
       } catch (error) {
         console.error("Error fetching Google Sheet data:", error);
+        setError(`${error}`);
         toast.error("ไม่สามารถดึงข้อมูลจาก Google Sheets ได้");
       } finally {
         setIsLoading(false);
@@ -86,9 +100,10 @@ export const useGoogleSheets = (sheetName: string) => {
 
   const updateCell = async (sheetName: string, row: number, col: number, value: string) => {
     try {
-      // This is a placeholder for the update functionality
-      // In a real implementation, we'd use the Google Sheets API to update the cell
-      // This would require OAuth2 authentication, not just an API key
+      // Note: แก้ไขข้อมูลใน Google Sheets จำเป็นต้องใช้ OAuth2 ไม่ใช่แค่ API key
+      // ตัวอย่างนี้เป็นเพียงแค่การจำลองการบันทึกข้อมูล
+      // ในการใช้งานจริงต้องเพิ่มการรับรองด้วย OAuth2
+      console.log(`Update cell in sheet: ${sheetName}, row: ${row}, col: ${col}, value: ${value}`);
       
       toast.success("บันทึกข้อมูลสำเร็จ");
       return true;
@@ -99,5 +114,5 @@ export const useGoogleSheets = (sheetName: string) => {
     }
   };
 
-  return { isLoading, sheetData, summary, updateCell };
+  return { isLoading, sheetData, summary, updateCell, error };
 };

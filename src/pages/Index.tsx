@@ -2,13 +2,15 @@
 import { useEffect, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import OrdersTable from "@/components/OrdersTable";
 import { useGoogleSheets } from "@/hooks/useGoogleSheets";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
+import { InfoIcon } from "lucide-react";
 
 const Index = () => {
   const [activeTab, setActiveTab] = useState("17/05/68");
-  const { isLoading, sheetData, summary } = useGoogleSheets(activeTab);
+  const { isLoading, sheetData, summary, updateCell, error } = useGoogleSheets(activeTab);
   
   const dateOptions = [
     "17/05/68", "18/05/68", "19/05/68", "20/05/68", 
@@ -24,6 +26,16 @@ const Index = () => {
           <h1 className="text-3xl font-bold text-gray-800">DTF Dashboard</h1>
           <p className="text-gray-600 mt-2">เชื่อมต่อกับ Google Sheets</p>
         </div>
+
+        {error && (
+          <Alert variant="destructive" className="bg-red-50 border-red-200">
+            <InfoIcon className="h-4 w-4" />
+            <AlertDescription>
+              มีข้อผิดพลาดในการเชื่อมต่อ: {error} 
+              <p className="text-sm">โปรดตรวจสอบ API Key และการตั้งค่าการเข้าถึง Google Sheets</p>
+            </AlertDescription>
+          </Alert>
+        )}
 
         {/* Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -81,8 +93,12 @@ const Index = () => {
               <div className="flex justify-center items-center py-20">
                 <LoadingSpinner size="lg" />
               </div>
+            ) : error ? (
+              <div className="flex justify-center items-center py-20 text-gray-500">
+                ไม่สามารถแสดงข้อมูลได้ กรุณาแก้ไข API Key
+              </div>
             ) : (
-              <OrdersTable data={sheetData} sheetName={activeTab} />
+              <OrdersTable data={sheetData} sheetName={activeTab} updateCell={updateCell} />
             )}
           </div>
         </Tabs>
