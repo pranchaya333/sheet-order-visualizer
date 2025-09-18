@@ -1,0 +1,422 @@
+<!-- ... existing html code ... -->
+            <form id="orderForm">
+                <!-- ... existing form fields ... -->
+                <div class="mt-6 flex justify-end gap-4">
+                    <button type="button" id="cancelModal" class="bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold py-2 px-4 rounded-lg">ยกเลิก</button>
+                    <button type="submit" class="bg-sky-500 hover:bg-sky-600 text-white font-bold py-2 px-4 rounded-lg">บันทึก</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Loading Indicator -->
+    <div id="loadingIndicator" class="modal" style="display: none; background-color: rgba(0,0,0,0.2);">
+        <div class="flex justify-center items-center h-full">
+            <div class="text-white text-2xl font-bold">กำลังโหลดข้อมูล...</div>
+        </div>
+    </div>
+
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    
+    // !!! วาง URL ของ WEB APP ที่คัดลอกมาตรงนี้ !!!
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzsnn8TV0rsi96iVql6mD5InZPAOX8f6_HtdA-N8D3nPejIlGXoQNohZf8bGRu6te4ABw/exec";
+
+    const salesChannels = ['เพจ1', 'เพจ2', 'หน้าร้าน', 'Shopee', 'Lazada', 'กรอบรูป', 'DTF'];
+    const orderStatuses = ['รอออกแบบ', 'รอแก้แบบ', 'ออกแบบ', 'คอนเฟิร์ม', 'ผลิต', 'ติดตั้ง/จัดส่ง'];
+
+    let appData = {
+        orders: [],
+        admins: [],
+        graphics: [],
+        clerks: [],
+    };
+    
+    const loadingIndicator = document.getElementById('loadingIndicator');
+
+    function showLoader(show) {
+        loadingIndicator.style.display = show ? 'block' : 'none';
+    }
+
+    async function fetchData(action, payload) {
+        showLoader(true);
+        try {
+            const method = action ? 'POST' : 'GET';
+            const options = {
+                method: method,
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // Use text/plain for Apps Script POST
+            };
+            if (method === 'POST') {
+                options.body = JSON.stringify({ action, payload });
+            }
+            
+            const response = await fetch(SCRIPT_URL, options);
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            return await response.json();
+        } catch (error) {
+            console.error('Fetch error:', error);
+            alert('เกิดข้อผิดพลาดในการเชื่อมต่อกับฐานข้อมูล');
+            return null;
+        } finally {
+            showLoader(false);
+        }
+    }
+    
+    // ... existing tab button logic ...
+// ... existing code ...
+    const tabButtons = document.querySelectorAll('.tab-button');
+    const tabContents = document.querySelectorAll('.tab-content');
+
+    tabButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            const tab = button.dataset.tab;
+
+            tabButtons.forEach(btn => {
+                btn.classList.remove('text-sky-600', 'border-sky-600');
+                btn.classList.add('text-slate-500');
+            });
+            button.classList.add('text-sky-600', 'border-sky-600');
+            button.classList.remove('text-slate-500');
+
+            tabContents.forEach(content => {
+                if (content.id === tab) {
+                    content.classList.remove('hidden');
+                } else {
+                    content.classList.add('hidden');
+                }
+            });
+             if (tab === 'dashboard') {
+                updateDashboard();
+            }
+        });
+    });
+    // ... existing modal logic ...
+    const modal = document.getElementById('orderModal');
+    const addOrderBtn = document.getElementById('addOrderBtn');
+    const closeModalBtn = document.getElementById('closeModal');
+    const cancelModalBtn = document.getElementById('cancelModal');
+    const orderForm = document.getElementById('orderForm');
+
+    addOrderBtn.onclick = function() {
+        openModal();
+    }
+    closeModalBtn.onclick = function() {
+        closeModal();
+    }
+    cancelModalBtn.onclick = function() {
+        closeModal();
+    }
+    window.onclick = function(event) {
+        if (event.target == modal) {
+            closeModal();
+        }
+    }
+
+    function openModal(order = null) {
+        orderForm.reset();
+        document.getElementById('orderId').value = '';
+        
+        populateSelect('orderStatus', orderStatuses);
+        populateSelect('admin', appData.admins);
+        populateSelect('graphic', appData.graphics);
+        populateSelect('clerk', appData.clerks);
+
+        if (order) {
+            document.getElementById('modalTitle').innerText = 'แก้ไขออเดอร์';
+            document.getElementById('orderId').value = order.id;
+            document.getElementById('orderNumber').value = order.orderNumber;
+            document.getElementById('productName').value = order.productName;
+            document.getElementById('productSize').value = order.productSize;
+            document.getElementById('customerFacebook').value = order.customerFacebook;
+            document.getElementById('customerAddress').value = order.customerAddress;
+            document.getElementById('orderStatus').value = order.status;
+            document.getElementById('orderDate').value = order.date;
+            document.getElementById('salesAmount').value = order.salesAmount;
+            document.getElementById('depositAmount').value = order.depositAmount;
+            document.getElementById('transferAmount').value = order.transferAmount;
+            document.getElementById('codAmount').value = order.codAmount;
+            document.getElementById('shippingFee').value = order.shippingFee;
+            document.getElementById('admin').value = order.admin;
+            document.getElementById('graphic').value = order.graphic;
+            document.getElementById('clerk').value = order.clerk;
+        } else {
+            document.getElementById('modalTitle').innerText = 'เพิ่มออเดอร์';
+            document.getElementById('orderDate').valueAsDate = new Date();
+        }
+        modal.style.display = 'block';
+    }
+
+    function closeModal() {
+        modal.style.display = 'none';
+    }
+    // Form Submission
+    orderForm.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const id = document.getElementById('orderId').value;
+        const orderData = {
+            id: id ? parseInt(id) : null,
+            orderNumber: document.getElementById('orderNumber').value,
+            productName: document.getElementById('productName').value,
+            productSize: document.getElementById('productSize').value,
+            customerFacebook: document.getElementById('customerFacebook').value,
+            customerAddress: document.getElementById('customerAddress').value,
+            status: document.getElementById('orderStatus').value,
+            date: document.getElementById('orderDate').value,
+            salesAmount: parseFloat(document.getElementById('salesAmount').value),
+            depositAmount: parseFloat(document.getElementById('depositAmount').value) || 0,
+            transferAmount: parseFloat(document.getElementById('transferAmount').value) || 0,
+            codAmount: parseFloat(document.getElementById('codAmount').value) || 0,
+            shippingFee: parseFloat(document.getElementById('shippingFee').value) || 0,
+            admin: document.getElementById('admin').value,
+            graphic: document.getElementById('graphic').value,
+            clerk: document.getElementById('clerk').value,
+            channel: salesChannels[Math.floor(Math.random() * salesChannels.length)]
+        };
+
+        const result = await fetchData('saveOrder', orderData);
+        if (result && result.status === 'success') {
+            closeModal();
+            initializeApp(); // Refresh all data
+        }
+    });
+    
+    // User Management
+    window.addUser = async function(type) {
+        const input = document.getElementById(`${type}Name`);
+        const name = input.value.trim();
+        if (name) {
+            const result = await fetchData('addUser', { type, name });
+            if (result && result.status === 'success') {
+                input.value = '';
+                initializeApp(); // Refresh all data
+            }
+        }
+    }
+
+    window.deleteUser = async function(type, name) {
+        // Find the index from the currently loaded data
+        const index = appData[`${type}s`].findIndex(u => u === name);
+        if (index > -1 && confirm(`คุณแน่ใจว่าต้องการลบ ${name}?`)) {
+             const result = await fetchData('deleteUser', { type, name });
+             if (result && result.status === 'success') {
+                initializeApp(); // Refresh all data
+            }
+        }
+    }
+    
+    function renderUserLists() {
+        renderList('admin', appData.admins, 'adminList');
+        renderList('graphic', appData.graphics, 'graphicList');
+        renderList('clerk', appData.clerks, 'clerkList');
+    }
+
+    function renderList(type, data, elementId) {
+        const listElement = document.getElementById(elementId);
+        listElement.innerHTML = '';
+        data.forEach((item, index) => {
+            const li = document.createElement('li');
+            li.className = 'flex justify-between items-center bg-slate-50 p-2 rounded';
+            li.innerHTML = `
+                <span class="text-slate-700">${item}</span>
+                <button onclick="deleteUser('${type}', '${item}')" class="text-red-500 hover:text-red-700 font-bold">ลบ</button>
+            `;
+            listElement.appendChild(li);
+        });
+    }
+
+    // Render Order Table
+    function renderOrderTable(ordersToRender = appData.orders) {
+        const tableBody = document.getElementById('orderTableBody');
+        tableBody.innerHTML = '';
+        if (!ordersToRender || ordersToRender.length === 0) {
+            tableBody.innerHTML = '<tr><td colspan="10" class="text-center p-6 text-slate-500">ไม่พบข้อมูลออเดอร์</td></tr>';
+            return;
+        }
+        
+        // Sort orders by date descending
+        ordersToRender.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+        ordersToRender.forEach(order => {
+            const row = document.createElement('tr');
+            row.className = 'bg-white border-b';
+            row.innerHTML = `
+                <td class="px-6 py-4 font-medium text-slate-900">${order.orderNumber}</td>
+                <td class="px-6 py-4">${order.productName} (${order.productSize})</td>
+                <td class="px-6 py-4">${order.customerFacebook}</td>
+                <td class="px-6 py-4"><span class="px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(order.status)}">${order.status}</span></td>
+                <td class="px-6 py-4">${new Date(order.date).toLocaleDateString('th-TH')}</td>
+                <td class="px-6 py-4">${(order.salesAmount || 0).toLocaleString()}</td>
+                <td class="px-6 py-4">${order.admin}</td>
+                <td class="px-6 py-4">${order.graphic}</td>
+                <td class="px-6 py-4">${order.clerk}</td>
+                <td class="px-6 py-4 flex gap-2">
+                    <button class="edit-btn text-sky-600 hover:text-sky-800" data-id="${order.id}">แก้ไข</button>
+                    <button class="delete-btn text-red-600 hover:text-red-800" data-id="${order.id}">ลบ</button>
+                </td>
+            `;
+            tableBody.appendChild(row);
+        });
+        
+        document.querySelectorAll('.edit-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const orderId = parseInt(e.target.dataset.id);
+                const order = appData.orders.find(o => o.id === orderId);
+                openModal(order);
+            });
+        });
+
+        document.querySelectorAll('.delete-btn').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                if (confirm('คุณแน่ใจว่าต้องการลบออเดอร์นี้?')) {
+                    const orderId = parseInt(e.target.dataset.id);
+                    const result = await fetchData('deleteOrder', { id: orderId });
+                    if (result && result.status === 'success') {
+                        initializeApp(); // Refresh all data
+                    }
+                }
+            });
+        });
+    }
+    
+// ... existing getStatusColor, filtering, dashboard, and populateSelect functions ...
+    function getStatusColor(status) {
+        switch(status) {
+            case 'รอออกแบบ': return 'bg-yellow-100 text-yellow-800';
+            case 'รอแก้แบบ': return 'bg-orange-100 text-orange-800';
+            case 'ออกแบบ': return 'bg-blue-100 text-blue-800';
+            case 'คอนเฟิร์ม': return 'bg-indigo-100 text-indigo-800';
+            case 'ผลิต': return 'bg-purple-100 text-purple-800';
+            case 'ติดตั้ง/จัดส่ง': return 'bg-green-100 text-green-800';
+            default: return 'bg-slate-100 text-slate-800';
+        }
+    }
+    document.getElementById('filterBtn').addEventListener('click', applyFilters);
+    document.getElementById('resetFilterBtn').addEventListener('click', resetFilters);
+
+    function applyFilters() {
+        let filteredOrders = [...appData.orders];
+        const start = document.getElementById('startDate').value;
+        const end = document.getElementById('endDate').value;
+        const admin = document.getElementById('filterAdmin').value;
+        const graphic = document.getElementById('filterGraphic').value;
+        const clerk = document.getElementById('filterClerk').value;
+
+        if (start) {
+            filteredOrders = filteredOrders.filter(o => o.date >= start);
+        }
+        if (end) {
+            filteredOrders = filteredOrders.filter(o => o.date <= end);
+        }
+        if (admin) {
+            filteredOrders = filteredOrders.filter(o => o.admin === admin);
+        }
+        if (graphic) {
+            filteredOrders = filteredOrders.filter(o => o.graphic === graphic);
+        }
+        if (clerk) {
+            filteredOrders = filteredOrders.filter(o => o.clerk === clerk);
+        }
+
+        renderOrderTable(filteredOrders);
+    }
+
+    function resetFilters() {
+        document.getElementById('startDate').value = '';
+        document.getElementById('endDate').value = '';
+        document.getElementById('filterAdmin').value = '';
+        document.getElementById('filterGraphic').value = '';
+        document.getElementById('filterClerk').value = '';
+        renderOrderTable(appData.orders);
+    }
+    function updateFilterOptions() {
+        populateSelect('filterAdmin', appData.admins, 'แอดมินทั้งหมด');
+        populateSelect('filterGraphic', appData.graphics, 'กราฟฟิคทั้งหมด');
+        populateSelect('filterClerk', appData.clerks, 'ธุรการทั้งหมด');
+    }
+    
+    let salesChart, statusChart;
+    function updateDashboard() {
+        if (!appData.orders) return;
+        const totalSales = appData.orders.reduce((sum, order) => sum + (order.salesAmount || 0), 0);
+        const totalOrders = appData.orders.length;
+        const completedOrders = appData.orders.filter(o => o.status === 'ติดตั้ง/จัดส่ง').length;
+        const pendingOrders = totalOrders - completedOrders;
+
+        document.getElementById('totalSales').textContent = `฿${totalSales.toLocaleString()}`;
+        document.getElementById('totalOrders').textContent = totalOrders;
+        document.getElementById('completedOrders').textContent = completedOrders;
+        document.getElementById('pendingOrders').textContent = pendingOrders;
+
+        const salesByChannelData = salesChannels.map(channel => {
+            return appData.orders
+                .filter(order => order.channel === channel)
+                .reduce((sum, order) => sum + (order.salesAmount || 0), 0);
+        });
+
+        const ordersByStatusData = orderStatuses.map(status => {
+            return appData.orders.filter(order => order.status === status).length;
+        });
+
+        const salesCtx = document.getElementById('salesByChannelChart').getContext('2d');
+        if (salesChart) salesChart.destroy();
+        salesChart = new Chart(salesCtx, {
+            type: 'bar',
+            data: {
+                labels: salesChannels,
+                datasets: [{
+                    label: 'ยอดขาย',
+                    data: salesByChannelData,
+                    backgroundColor: 'rgba(59, 130, 246, 0.7)',
+                    borderColor: 'rgba(59, 130, 246, 1)',
+                    borderWidth: 1
+                }]
+            },
+            options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } } }
+        });
+
+        const statusCtx = document.getElementById('orderByStatusChart').getContext('2d');
+        if (statusChart) statusChart.destroy();
+        statusChart = new Chart(statusCtx, {
+            type: 'doughnut',
+            data: {
+                labels: orderStatuses,
+                datasets: [{
+                    label: 'จำนวนออเดอร์',
+                    data: ordersByStatusData,
+                    backgroundColor: ['#fde047', '#fb923c', '#60a5fa', '#818cf8', '#c084fc', '#4ade80'],
+                    hoverOffset: 4
+                }]
+            },
+             options: { responsive: true, maintainAspectRatio: false }
+        });
+    }
+    
+    function populateSelect(elementId, options, defaultOptionText = '') {
+        const select = document.getElementById(elementId);
+        select.innerHTML = '';
+        if (defaultOptionText) {
+            const defaultOption = document.createElement('option');
+            defaultOption.value = '';
+            defaultOption.textContent = defaultOptionText;
+            select.appendChild(defaultOption);
+        }
+        options.forEach(option => {
+            const opt = document.createElement('option');
+            opt.value = option;
+            opt.textContent = option;
+            select.appendChild(opt);
+        });
+    }
+    
+    // Initial Load
+    async function initializeApp() {
+        const data = await fetchData();
+        if (data && !data.error) {
+            appData = data;
+            renderUserLists();
+            updateFilterOptions();
+            renderOrderTable();
+            updateDashboard();
+        }
+    }
