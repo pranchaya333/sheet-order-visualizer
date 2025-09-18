@@ -1,6 +1,237 @@
-<!-- ... existing html code ... -->
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบจัดการออเดอร์และแดชบอร์ด</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;700&display=swap" rel="stylesheet">
+    <!-- Chosen Palette: Cool Gray & Blue -->
+    <!-- Application Structure Plan: The application is designed as a single-page dashboard with tab-based navigation for optimal user experience. The structure includes: 1) Dashboard View: For a quick overview with KPIs and charts. 2) Order Management View: A detailed, filterable table for CRUD operations on orders. 3) User Management View: Simple forms to manage staff. This task-oriented structure was chosen because it allows users to switch between high-level summaries and detailed management tasks seamlessly without leaving the page, which is highly efficient for workflow management. Modals are used for forms to keep the user in context. -->
+    <!-- Visualization & Content Choices: 
+        - Sales by Channel: Report Info -> Goal: Compare channel performance -> Viz: Bar Chart -> Interaction: Hover tooltips -> Justification: Best for comparing discrete categories -> Library: Chart.js.
+        - Orders by Status: Report Info -> Goal: Show workflow distribution -> Viz: Donut Chart -> Interaction: Hover tooltips -> Justification: Ideal for showing part-to-whole relationships -> Library: Chart.js.
+        - Order Details: Report Info -> Goal: Detailed CRUD management -> Method: Interactive HTML Table -> Interaction: Add, Edit, Delete, Filter by date/staff -> Justification: Standard and effective for structured data management -> Method: Vanilla JS DOM manipulation.
+        - User Data: Report Info -> Goal: Manage staff roles -> Method: Simple lists and forms -> Interaction: Add/Delete users -> Justification: User-friendly for simple data entry and management -> Method: Vanilla JS.
+    -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body {
+            font-family: 'Sarabun', sans-serif;
+            background-color: #f8fafc;
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 300px;
+            max-height: 400px;
+        }
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 350px;
+            }
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 50;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.5);
+        }
+        .modal-content {
+            background-color: #fefefe;
+            margin: 5% auto;
+            padding: 2rem;
+            border: 1px solid #888;
+            width: 90%;
+            max-width: 50rem;
+            border-radius: 0.5rem;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container mx-auto p-4 md:p-6">
+
+        <header class="mb-6">
+            <h1 class="text-3xl font-bold text-slate-800">ระบบจัดการออเดอร์และแดชบอร์ด</h1>
+            <p class="text-slate-500">ภาพรวมสถานะงานและออเดอร์ทั้งหมด</p>
+        </header>
+
+        <nav class="bg-white rounded-lg shadow-sm mb-6">
+            <div class="flex border-b border-slate-200">
+                <button data-tab="dashboard" class="tab-button flex-1 py-3 px-4 text-center font-semibold text-sky-600 border-b-2 border-sky-600">แดชบอร์ด</button>
+                <button data-tab="orders" class="tab-button flex-1 py-3 px-4 text-center font-semibold text-slate-500">จัดการออเดอร์</button>
+                <button data-tab="users" class="tab-button flex-1 py-3 px-4 text-center font-semibold text-slate-500">จัดการผู้ใช้งาน</button>
+            </div>
+        </nav>
+
+        <main>
+            <!-- Dashboard Content -->
+            <div id="dashboard" class="tab-content">
+                <section class="mb-6">
+                    <p class="text-slate-700 mb-4">ส่วนนี้จะแสดงภาพรวมข้อมูลสำคัญ เช่น ยอดขายรวม จำนวนออเดอร์ และสรุปสถานะของงานในรูปแบบแผนภูมิที่เข้าใจง่าย ช่วยให้คุณมองเห็นแนวโน้มและประสิทธิภาพของช่องทางการขายต่างๆ ได้อย่างรวดเร็ว</p>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div class="bg-white p-5 rounded-lg shadow-sm">
+                            <h3 class="text-slate-500 text-sm font-medium">ยอดขายรวม</h3>
+                            <p id="totalSales" class="text-3xl font-bold text-slate-800">฿0</p>
+                        </div>
+                        <div class="bg-white p-5 rounded-lg shadow-sm">
+                            <h3 class="text-slate-500 text-sm font-medium">ออเดอร์ทั้งหมด</h3>
+                            <p id="totalOrders" class="text-3xl font-bold text-slate-800">0</p>
+                        </div>
+                         <div class="bg-white p-5 rounded-lg shadow-sm">
+                            <h3 class="text-slate-500 text-sm font-medium">งานที่เสร็จสิ้น</h3>
+                            <p id="completedOrders" class="text-3xl font-bold text-slate-800">0</p>
+                        </div>
+                        <div class="bg-white p-5 rounded-lg shadow-sm">
+                            <h3 class="text-slate-500 text-sm font-medium">งานที่รอดำเนินการ</h3>
+                            <p id="pendingOrders" class="text-3xl font-bold text-slate-800">0</p>
+                        </div>
+                    </div>
+                </section>
+                <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="bg-white p-5 rounded-lg shadow-sm">
+                        <h3 class="font-semibold text-slate-800 mb-4">ยอดขายตามช่องทาง</h3>
+                        <div class="chart-container">
+                            <canvas id="salesByChannelChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="bg-white p-5 rounded-lg shadow-sm">
+                        <h3 class="font-semibold text-slate-800 mb-4">สถานะออเดอร์</h3>
+                        <div class="chart-container">
+                            <canvas id="orderByStatusChart"></canvas>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <!-- Orders Content -->
+            <div id="orders" class="tab-content hidden">
+                <section class="bg-white p-5 rounded-lg shadow-sm">
+                     <p class="text-slate-700 mb-4">จัดการออเดอร์ทั้งหมดได้ในที่เดียว คุณสามารถเพิ่มออเดอร์ใหม่ แก้ไขรายละเอียด หรือลบออเดอร์ที่ไม่ต้องการได้ ใช้เครื่องมือค้นหาและตัวกรองเพื่อจำกัดการแสดงผลตามวันที่, สถานะ, หรือพนักงานที่รับผิดชอบ เพื่อให้การติดตามงานเป็นไปอย่างมีประสิทธิภาพ</p>
+                    <div class="flex flex-wrap gap-4 items-center mb-4">
+                        <button id="addOrderBtn" class="bg-sky-500 hover:bg-sky-600 text-white font-bold py-2 px-4 rounded-lg">เพิ่มออเดอร์</button>
+                        <div class="flex gap-2 items-center">
+                            <label for="startDate" class="text-sm font-medium text-slate-700">จาก:</label>
+                            <input type="date" id="startDate" name="startDate" class="border border-slate-300 rounded-md p-1.5 text-sm">
+                        </div>
+                        <div class="flex gap-2 items-center">
+                             <label for="endDate" class="text-sm font-medium text-slate-700">ถึง:</label>
+                             <input type="date" id="endDate" name="endDate" class="border border-slate-300 rounded-md p-1.5 text-sm">
+                        </div>
+                        <select id="filterAdmin" class="border border-slate-300 rounded-md p-2 text-sm">
+                            <option value="">แอดมินทั้งหมด</option>
+                        </select>
+                        <select id="filterGraphic" class="border border-slate-300 rounded-md p-2 text-sm">
+                            <option value="">กราฟฟิคทั้งหมด</option>
+                        </select>
+                         <select id="filterClerk" class="border border-slate-300 rounded-md p-2 text-sm">
+                            <option value="">ธุรการทั้งหมด</option>
+                        </select>
+                        <button id="filterBtn" class="bg-slate-500 hover:bg-slate-600 text-white font-bold py-2 px-4 rounded-lg text-sm">ค้นหา</button>
+                         <button id="resetFilterBtn" class="bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold py-2 px-4 rounded-lg text-sm">ล้างค่า</button>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm text-left text-slate-500">
+                            <thead class="text-xs text-slate-700 uppercase bg-slate-50">
+                                <tr>
+                                    <th scope="col" class="px-6 py-3">เลขที่</th>
+                                    <th scope="col" class="px-6 py-3">สินค้า</th>
+                                    <th scope="col" class="px-6 py-3">ลูกค้า</th>
+                                    <th scope="col" class="px-6 py-3">สถานะ</th>
+                                    <th scope="col" class="px-6 py-3">วันที่</th>
+                                    <th scope="col" class="px-6 py-3">ยอดขาย</th>
+                                    <th scope="col" class="px-6 py-3">แอดมิน</th>
+                                    <th scope="col" class="px-6 py-3">กราฟฟิค</th>
+                                    <th scope="col" class="px-6 py-3">ธุรการ</th>
+                                    <th scope="col" class="px-6 py-3">จัดการ</th>
+                                </tr>
+                            </thead>
+                            <tbody id="orderTableBody">
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+
+            <!-- Users Content -->
+            <div id="users" class="tab-content hidden">
+                 <p class="text-slate-700 mb-4">ส่วนนี้ใช้สำหรับเพิ่ม ลบ หรือจัดการข้อมูลพนักงานในแต่ละตำแหน่ง ไม่ว่าจะเป็นแอดมิน, กราฟิก, หรือธุรการ การมีฐานข้อมูลพนักงานที่อัปเดตอยู่เสมอจะช่วยให้การมอบหมายและติดตามงานในแต่ละออเดอร์ทำได้อย่างถูกต้องและแม่นยำ</p>
+                 <div class="text-center p-4 mb-4 bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 rounded-md">
+                    <p class="font-bold">หมายเหตุ:</p>
+                    <p>นี่คือเวอร์ชันต้นแบบ ข้อมูลผู้ใช้งานและออเดอร์จะถูกเก็บไว้ในเบราว์เซอร์ชั่วคราวเท่านั้น หากปิดหน้าต่าง ข้อมูลจะหายไป การเชื่อมต่อกับฐานข้อมูลถาวรเช่น Google Sheets จะต้องมีการตั้งค่าเพิ่มเติมในฝั่งเซิร์ฟเวอร์</p>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <!-- Admins -->
+                    <div class="bg-white p-5 rounded-lg shadow-sm">
+                        <h3 class="font-semibold text-slate-800 mb-4">แอดมิน</h3>
+                        <div class="flex gap-2 mb-4">
+                            <input type="text" id="adminName" placeholder="เพิ่มชื่อแอดมิน" class="flex-grow border border-slate-300 rounded-md p-2 text-sm">
+                            <button onclick="addUser('admin')" class="bg-sky-500 hover:bg-sky-600 text-white font-bold py-2 px-4 rounded-lg text-sm">เพิ่ม</button>
+                        </div>
+                        <ul id="adminList" class="space-y-2"></ul>
+                    </div>
+                    <!-- Graphics -->
+                    <div class="bg-white p-5 rounded-lg shadow-sm">
+                        <h3 class="font-semibold text-slate-800 mb-4">กราฟฟิค</h3>
+                        <div class="flex gap-2 mb-4">
+                            <input type="text" id="graphicName" placeholder="เพิ่มชื่อกราฟฟิค" class="flex-grow border border-slate-300 rounded-md p-2 text-sm">
+                            <button onclick="addUser('graphic')" class="bg-sky-500 hover:bg-sky-600 text-white font-bold py-2 px-4 rounded-lg text-sm">เพิ่ม</button>
+                        </div>
+                        <ul id="graphicList" class="space-y-2"></ul>
+                    </div>
+                    <!-- Clerks -->
+                    <div class="bg-white p-5 rounded-lg shadow-sm">
+                        <h3 class="font-semibold text-slate-800 mb-4">ธุรการ</h3>
+                        <div class="flex gap-2 mb-4">
+                            <input type="text" id="clerkName" placeholder="เพิ่มชื่อธุรการ" class="flex-grow border border-slate-300 rounded-md p-2 text-sm">
+                            <button onclick="addUser('clerk')" class="bg-sky-500 hover:bg-sky-600 text-white font-bold py-2 px-4 rounded-lg text-sm">เพิ่ม</button>
+                        </div>
+                        <ul id="clerkList" class="space-y-2"></ul>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Order Modal -->
+    <div id="orderModal" class="modal">
+        <div class="modal-content">
+            <div class="flex justify-between items-center mb-4">
+                <h2 id="modalTitle" class="text-2xl font-bold text-slate-800">เพิ่ม/แก้ไขออเดอร์</h2>
+                <button id="closeModal" class="text-3xl font-bold text-slate-500 hover:text-slate-700">&times;</button>
+            </div>
             <form id="orderForm">
-                <!-- ... existing form fields ... -->
+                <input type="hidden" id="orderId">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <input type="text" id="orderNumber" placeholder="เลขที่ออเดอร์" class="p-2 border rounded" required>
+                    <input type="text" id="productName" placeholder="ชื่อสินค้า" class="p-2 border rounded" required>
+                    <input type="text" id="productSize" placeholder="ขนาด" class="p-2 border rounded">
+                    <input type="text" id="customerFacebook" placeholder="ชื่อเฟส" class="p-2 border rounded" required>
+                    <textarea id="customerAddress" placeholder="ที่อยู่และเบอร์โทร" class="p-2 border rounded md:col-span-2" rows="3"></textarea>
+                    
+                    <select id="orderStatus" class="p-2 border rounded" required></select>
+                    <input type="date" id="orderDate" class="p-2 border rounded" required>
+
+                    <input type="number" id="salesAmount" placeholder="ยอดขาย" class="p-2 border rounded" required>
+                    <input type="number" id="depositAmount" placeholder="มัดจำ" class="p-2 border rounded">
+                    <input type="number" id="transferAmount" placeholder="ยอดโอน" class="p-2 border rounded">
+                    <input type="number" id="codAmount" placeholder="ยอดปลายทาง" class="p-2 border rounded">
+                    <input type="number" id="shippingFee" placeholder="ค่าส่ง" class="p-2 border rounded">
+                    
+                    <select id="admin" class="p-2 border rounded" required></select>
+                    <select id="graphic" class="p-2 border rounded" required></select>
+                    <select id="clerk" class="p-2 border rounded" required></select>
+                </div>
                 <div class="mt-6 flex justify-end gap-4">
                     <button type="button" id="cancelModal" class="bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold py-2 px-4 rounded-lg">ยกเลิก</button>
                     <button type="submit" class="bg-sky-500 hover:bg-sky-600 text-white font-bold py-2 px-4 rounded-lg">บันทึก</button>
@@ -9,20 +240,10 @@
         </div>
     </div>
 
-    <!-- Loading Indicator -->
-    <div id="loadingIndicator" class="modal" style="display: none; background-color: rgba(0,0,0,0.2);">
-        <div class="flex justify-center items-center h-full">
-            <div class="text-white text-2xl font-bold">กำลังโหลดข้อมูล...</div>
-        </div>
-    </div>
-
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     
-    // !!! วาง URL ของ WEB APP ที่คัดลอกมาตรงนี้ !!!
-    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzsnn8TV0rsi96iVql6mD5InZPAOX8f6_HtdA-N8D3nPejIlGXoQNohZf8bGRu6te4ABw/exec";
-
     const salesChannels = ['เพจ1', 'เพจ2', 'หน้าร้าน', 'Shopee', 'Lazada', 'กรอบรูป', 'DTF'];
     const orderStatuses = ['รอออกแบบ', 'รอแก้แบบ', 'ออกแบบ', 'คอนเฟิร์ม', 'ผลิต', 'ติดตั้ง/จัดส่ง'];
 
@@ -33,38 +254,28 @@ document.addEventListener('DOMContentLoaded', function() {
         clerks: [],
     };
     
-    const loadingIndicator = document.getElementById('loadingIndicator');
-
-    function showLoader(show) {
-        loadingIndicator.style.display = show ? 'block' : 'none';
+    function saveData() {
+        localStorage.setItem('dashboardData', JSON.stringify(appData));
     }
 
-    async function fetchData(action, payload) {
-        showLoader(true);
-        try {
-            const method = action ? 'POST' : 'GET';
-            const options = {
-                method: method,
-                headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // Use text/plain for Apps Script POST
-            };
-            if (method === 'POST') {
-                options.body = JSON.stringify({ action, payload });
-            }
-            
-            const response = await fetch(SCRIPT_URL, options);
-            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-            return await response.json();
-        } catch (error) {
-            console.error('Fetch error:', error);
-            alert('เกิดข้อผิดพลาดในการเชื่อมต่อกับฐานข้อมูล');
-            return null;
-        } finally {
-            showLoader(false);
+    function loadData() {
+        const data = localStorage.getItem('dashboardData');
+        if (data) {
+            appData = JSON.parse(data);
+        } else {
+            // Mock Data for initial load
+            appData.admins = ['แอดมิน A', 'แอดมิน B'];
+            appData.graphics = ['กราฟฟิค X', 'กราฟฟิค Y'];
+            appData.clerks = ['ธุรการ 1', 'ธุรการ 2'];
+            appData.orders = [
+                { id: 1, orderNumber: 'A001', productName: 'เสื้อยืด', productSize: 'L', customerFacebook: 'ลูกค้า ใจดี', customerAddress: '123 กทม 0812345678', status: 'ผลิต', date: '2025-09-15', salesAmount: 500, depositAmount: 250, transferAmount: 250, codAmount: 0, shippingFee: 40, admin: 'แอดมิน A', graphic: 'กราฟฟิค X', clerk: 'ธุรการ 1', channel: 'เพจ1' },
+                { id: 2, orderNumber: 'A002', productName: 'แก้วน้ำ', productSize: '22oz', customerFacebook: 'ลูกค้า ชอบซื้อ', customerAddress: '456 เชียงใหม่ 0887654321', status: 'รอออกแบบ', date: '2025-09-16', salesAmount: 350, depositAmount: 0, transferAmount: 0, codAmount: 390, shippingFee: 40, admin: 'แอดมิน B', graphic: 'กราฟฟิค Y', clerk: 'ธุรการ 2', channel: 'Shopee' },
+                { id: 3, orderNumber: 'A003', productName: 'กรอบรูป', productSize: 'A4', customerFacebook: 'ลูกค้า มาเอง', customerAddress: '789 ขอนแก่น 0911223344', status: 'ติดตั้ง/จัดส่ง', date: '2025-09-17', salesAmount: 1200, depositAmount: 1200, transferAmount: 0, codAmount: 0, shippingFee: 0, admin: 'แอดมิน A', graphic: 'กราฟฟิค X', clerk: 'ธุรการ 1', channel: 'หน้าร้าน' },
+                 { id: 4, orderNumber: 'A004', productName: 'สติกเกอร์ DTF', productSize: '1m', customerFacebook: 'ลูกค้า ออนไลน์', customerAddress: '101 ภูเก็ต 0655443322', status: 'คอนเฟิร์ม', date: '2025-09-18', salesAmount: 800, depositAmount: 400, transferAmount: 400, codAmount: 0, shippingFee: 50, admin: 'แอดมิน B', graphic: 'กราฟฟิค Y', clerk: 'ธุรการ 2', channel: 'DTF' },
+            ];
         }
     }
-    
-    // ... existing tab button logic ...
-// ... existing code ...
+
     const tabButtons = document.querySelectorAll('.tab-button');
     const tabContents = document.querySelectorAll('.tab-content');
 
@@ -91,7 +302,8 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     });
-    // ... existing modal logic ...
+
+    // Modal Handling
     const modal = document.getElementById('orderModal');
     const addOrderBtn = document.getElementById('addOrderBtn');
     const closeModalBtn = document.getElementById('closeModal');
@@ -150,12 +362,13 @@ document.addEventListener('DOMContentLoaded', function() {
     function closeModal() {
         modal.style.display = 'none';
     }
+
     // Form Submission
-    orderForm.addEventListener('submit', async function(e) {
+    orderForm.addEventListener('submit', function(e) {
         e.preventDefault();
         const id = document.getElementById('orderId').value;
-        const orderData = {
-            id: id ? parseInt(id) : null,
+        const newOrder = {
+            id: id ? parseInt(id) : Date.now(),
             orderNumber: document.getElementById('orderNumber').value,
             productName: document.getElementById('productName').value,
             productSize: document.getElementById('productSize').value,
@@ -171,38 +384,38 @@ document.addEventListener('DOMContentLoaded', function() {
             admin: document.getElementById('admin').value,
             graphic: document.getElementById('graphic').value,
             clerk: document.getElementById('clerk').value,
-            channel: salesChannels[Math.floor(Math.random() * salesChannels.length)]
+            channel: salesChannels[Math.floor(Math.random() * salesChannels.length)] // Random channel for demo
         };
 
-        const result = await fetchData('saveOrder', orderData);
-        if (result && result.status === 'success') {
-            closeModal();
-            initializeApp(); // Refresh all data
+        if (id) {
+            const index = appData.orders.findIndex(o => o.id === parseInt(id));
+            appData.orders[index] = newOrder;
+        } else {
+            appData.orders.push(newOrder);
         }
+        
+        saveData();
+        renderOrderTable();
+        closeModal();
     });
     
     // User Management
-    window.addUser = async function(type) {
+    window.addUser = function(type) {
         const input = document.getElementById(`${type}Name`);
         const name = input.value.trim();
         if (name) {
-            const result = await fetchData('addUser', { type, name });
-            if (result && result.status === 'success') {
-                input.value = '';
-                initializeApp(); // Refresh all data
-            }
+            appData[`${type}s`].push(name);
+            input.value = '';
+            saveData();
+            renderUserLists();
         }
     }
 
-    window.deleteUser = async function(type, name) {
-        // Find the index from the currently loaded data
-        const index = appData[`${type}s`].findIndex(u => u === name);
-        if (index > -1 && confirm(`คุณแน่ใจว่าต้องการลบ ${name}?`)) {
-             const result = await fetchData('deleteUser', { type, name });
-             if (result && result.status === 'success') {
-                initializeApp(); // Refresh all data
-            }
-        }
+    window.deleteUser = function(type, index) {
+        appData[`${type}s`].splice(index, 1);
+        saveData();
+        renderUserLists();
+        updateFilterOptions();
     }
     
     function renderUserLists() {
@@ -219,7 +432,7 @@ document.addEventListener('DOMContentLoaded', function() {
             li.className = 'flex justify-between items-center bg-slate-50 p-2 rounded';
             li.innerHTML = `
                 <span class="text-slate-700">${item}</span>
-                <button onclick="deleteUser('${type}', '${item}')" class="text-red-500 hover:text-red-700 font-bold">ลบ</button>
+                <button onclick="deleteUser('${type}', ${index})" class="text-red-500 hover:text-red-700 font-bold">ลบ</button>
             `;
             listElement.appendChild(li);
         });
@@ -229,13 +442,10 @@ document.addEventListener('DOMContentLoaded', function() {
     function renderOrderTable(ordersToRender = appData.orders) {
         const tableBody = document.getElementById('orderTableBody');
         tableBody.innerHTML = '';
-        if (!ordersToRender || ordersToRender.length === 0) {
+        if (ordersToRender.length === 0) {
             tableBody.innerHTML = '<tr><td colspan="10" class="text-center p-6 text-slate-500">ไม่พบข้อมูลออเดอร์</td></tr>';
             return;
         }
-        
-        // Sort orders by date descending
-        ordersToRender.sort((a, b) => new Date(b.date) - new Date(a.date));
 
         ordersToRender.forEach(order => {
             const row = document.createElement('tr');
@@ -246,7 +456,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 <td class="px-6 py-4">${order.customerFacebook}</td>
                 <td class="px-6 py-4"><span class="px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(order.status)}">${order.status}</span></td>
                 <td class="px-6 py-4">${new Date(order.date).toLocaleDateString('th-TH')}</td>
-                <td class="px-6 py-4">${(order.salesAmount || 0).toLocaleString()}</td>
+                <td class="px-6 py-4">${order.salesAmount.toLocaleString()}</td>
                 <td class="px-6 py-4">${order.admin}</td>
                 <td class="px-6 py-4">${order.graphic}</td>
                 <td class="px-6 py-4">${order.clerk}</td>
@@ -258,6 +468,7 @@ document.addEventListener('DOMContentLoaded', function() {
             tableBody.appendChild(row);
         });
         
+        // Add event listeners for new buttons
         document.querySelectorAll('.edit-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const orderId = parseInt(e.target.dataset.id);
@@ -267,19 +478,17 @@ document.addEventListener('DOMContentLoaded', function() {
         });
 
         document.querySelectorAll('.delete-btn').forEach(btn => {
-            btn.addEventListener('click', async (e) => {
+            btn.addEventListener('click', (e) => {
                 if (confirm('คุณแน่ใจว่าต้องการลบออเดอร์นี้?')) {
                     const orderId = parseInt(e.target.dataset.id);
-                    const result = await fetchData('deleteOrder', { id: orderId });
-                    if (result && result.status === 'success') {
-                        initializeApp(); // Refresh all data
-                    }
+                    appData.orders = appData.orders.filter(o => o.id !== orderId);
+                    saveData();
+                    renderOrderTable();
                 }
             });
         });
     }
     
-// ... existing getStatusColor, filtering, dashboard, and populateSelect functions ...
     function getStatusColor(status) {
         switch(status) {
             case 'รอออกแบบ': return 'bg-yellow-100 text-yellow-800';
@@ -291,6 +500,8 @@ document.addEventListener('DOMContentLoaded', function() {
             default: return 'bg-slate-100 text-slate-800';
         }
     }
+    
+    // Filtering
     document.getElementById('filterBtn').addEventListener('click', applyFilters);
     document.getElementById('resetFilterBtn').addEventListener('click', resetFilters);
 
@@ -329,16 +540,18 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('filterClerk').value = '';
         renderOrderTable(appData.orders);
     }
+
     function updateFilterOptions() {
         populateSelect('filterAdmin', appData.admins, 'แอดมินทั้งหมด');
         populateSelect('filterGraphic', appData.graphics, 'กราฟฟิคทั้งหมด');
         populateSelect('filterClerk', appData.clerks, 'ธุรการทั้งหมด');
     }
     
+    // Dashboard
     let salesChart, statusChart;
     function updateDashboard() {
-        if (!appData.orders) return;
-        const totalSales = appData.orders.reduce((sum, order) => sum + (order.salesAmount || 0), 0);
+        // KPIs
+        const totalSales = appData.orders.reduce((sum, order) => sum + order.salesAmount, 0);
         const totalOrders = appData.orders.length;
         const completedOrders = appData.orders.filter(o => o.status === 'ติดตั้ง/จัดส่ง').length;
         const pendingOrders = totalOrders - completedOrders;
@@ -348,16 +561,18 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('completedOrders').textContent = completedOrders;
         document.getElementById('pendingOrders').textContent = pendingOrders;
 
+        // Chart Data
         const salesByChannelData = salesChannels.map(channel => {
             return appData.orders
                 .filter(order => order.channel === channel)
-                .reduce((sum, order) => sum + (order.salesAmount || 0), 0);
+                .reduce((sum, order) => sum + order.salesAmount, 0);
         });
 
         const ordersByStatusData = orderStatuses.map(status => {
             return appData.orders.filter(order => order.status === status).length;
         });
 
+        // Sales by Channel Chart
         const salesCtx = document.getElementById('salesByChannelChart').getContext('2d');
         if (salesChart) salesChart.destroy();
         salesChart = new Chart(salesCtx, {
@@ -372,9 +587,16 @@ document.addEventListener('DOMContentLoaded', function() {
                     borderWidth: 1
                 }]
             },
-            options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } } }
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: { beginAtZero: true }
+                }
+            }
         });
 
+        // Order by Status Chart
         const statusCtx = document.getElementById('orderByStatusChart').getContext('2d');
         if (statusChart) statusChart.destroy();
         statusChart = new Chart(statusCtx, {
@@ -384,11 +606,16 @@ document.addEventListener('DOMContentLoaded', function() {
                 datasets: [{
                     label: 'จำนวนออเดอร์',
                     data: ordersByStatusData,
-                    backgroundColor: ['#fde047', '#fb923c', '#60a5fa', '#818cf8', '#c084fc', '#4ade80'],
+                    backgroundColor: [
+                        '#fde047', '#fb923c', '#60a5fa', '#818cf8', '#c084fc', '#4ade80'
+                    ],
                     hoverOffset: 4
                 }]
             },
-             options: { responsive: true, maintainAspectRatio: false }
+             options: {
+                responsive: true,
+                maintainAspectRatio: false
+            }
         });
     }
     
@@ -408,15 +635,19 @@ document.addEventListener('DOMContentLoaded', function() {
             select.appendChild(opt);
         });
     }
-    
+
     // Initial Load
-    async function initializeApp() {
-        const data = await fetchData();
-        if (data && !data.error) {
-            appData = data;
-            renderUserLists();
-            updateFilterOptions();
-            renderOrderTable();
-            updateDashboard();
-        }
+    function initializeApp() {
+        loadData();
+        renderUserLists();
+        updateFilterOptions();
+        renderOrderTable();
+        updateDashboard();
     }
+    
+    initializeApp();
+});
+</script>
+
+</body>
+</html>
